@@ -1,14 +1,68 @@
 import React, {useEffect, useState} from 'react';
-import {Button, Linking, Text, View} from 'react-native';
+import {Button, Image, Linking, Text, View} from 'react-native';
 import {encode as btoa, decode as atob} from 'base-64';
 import solanaWeb3 from '@solana/web3.js';
+import {StyleSheet, Dimensions} from 'react-native';
+const {height} = Dimensions.get('window');
+
+const styles = StyleSheet.create({
+  container: {
+    display: 'flex',
+    height: height,
+    justifyContent: 'center',
+    flexGrow: 1,
+    alignItems: 'center',
+    overflow: 'scroll',
+  },
+  btn: {
+    marginBottom: 10,
+    marginTop: 10,
+  },
+  nftBtn: {
+    marginBottom: 10,
+    display: 'flex',
+    justifyContent: 'space-around',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  result: {
+    borderWidth: 2,
+    borderColor: 'red',
+    padding: 10,
+    height: 100,
+    overflow: 'hidden',
+  },
+  img: {
+    height: 50,
+    width: 50,
+    marginRight: 30,
+  },
+});
+
 export const Redirect = () => {
   const [result, setResult] = useState<string>('~So Empty~');
   const [triggerUrl, setTriggerUrl] = useState<string>('');
+  const [nfts, setNfts] = useState<any[]>([]);
   useEffect(() => {
     try {
       const url = new URL(triggerUrl);
       setResult(atob(`${url.searchParams.get('result')}`));
+      const nft: any[] = JSON.parse(
+        atob(`${url.searchParams.get('result')}`) || '',
+      );
+      if (nft.length) {
+        setNfts(
+          nft.map(n => {
+            return {
+              mint_address: n.mintAddress,
+              image: n.metaplexData.offChainMetaData.image,
+              name: n.metaplexData.offChainMetaData.name,
+            };
+          }),
+        );
+      } else {
+        setNfts([]);
+      }
     } catch (e) {
       setResult('');
     }
@@ -18,6 +72,7 @@ export const Redirect = () => {
       setTriggerUrl(e.url);
     });
   }, []);
+
   const generateTransaction = async () => {
     const target_network = {
       blockExplorerUrl: 'https://explorer.solana.com',
@@ -47,15 +102,15 @@ export const Redirect = () => {
     }).add(TransactionInstruction);
     return transaction.serializeMessage().toString('hex');
   };
-  const openurl = async (method: string) => {
-    const baseurl = 'http://192.168.0.100:8080/redirectflow';
+  const openurl = async (method: string, mint?: string) => {
+    const baseurl = 'http://192.168.0.102:8080/redirectflow';
     let url = baseurl;
     let params = {};
     let queryParams = new URLSearchParams();
     switch (method) {
       case 'nft_transfer':
         params = {
-          mint_add: '4k2JEFZ9xwQhzFkRpa4YL8RjaUFsza8KCAZ99hmWdT93',
+          mint_add: mint,
           receiver_add: '24s5oo1A5BzDvqKgqdem3777kPMnLgWgZFDhC9qGvWNz',
           sender_add: 'AyLEezjkWF7fyZq4iis5cASh2A5FpekwMKRZxVrPGDbg',
         };
@@ -89,45 +144,49 @@ export const Redirect = () => {
   };
 
   return (
-    <View>
-      <Button
-        onPress={() => {
-          openurl('login');
-        }}
-        title="LOGIN"
-      />
-      <Button
-        onPress={() => {
-          openurl('logout');
-        }}
-        title="LOGOUT"
-      />
-      <Button
-        onPress={() => {
-          openurl('nft_transfer');
-        }}
-        title="Transfer Nft"
-      />
-      <Button
-        onPress={() => {
-          openurl('nft_list');
-        }}
-        title="List NFT"
-      />
-      {/* <Button
-      NOT WORKING ATM
-        onPress={() => {
-          openurl('send_transaction');
-        }}
-        title="Send Transction"
-      />
-      <Button
-        onPress={() => {
-          openurl('sign_transaction');
-        }}
-        title="Sign Transction"
-      /> */}
-      <Text>{result}</Text>
+    <View style={styles.container}>
+      <View style={styles.btn}>
+        <Button
+          onPress={() => {
+            openurl('login');
+          }}
+          title="LOGIN"
+        />
+      </View>
+      <View style={styles.btn}>
+        <Button
+          onPress={() => {
+            openurl('logout');
+          }}
+          title="LOGOUT"
+        />
+      </View>
+
+      {nfts.map(n => (
+        <View style={styles.nftBtn} key={n.mint_address}>
+          <Image source={{uri: n.image + ''}} style={styles.img} />
+          <View style={styles.btn} key={n.mint_address}>
+            <Button
+              onPress={() => {
+                openurl('nft_transfer', n.mint_address);
+              }}
+              title={'Transfer -> ' + n?.name}
+            />
+          </View>
+        </View>
+      ))}
+
+      <View style={styles.btn}>
+        <Button
+          onPress={() => {
+            openurl('nft_list');
+          }}
+          title="List NFT"
+        />
+      </View>
+      <View style={styles.result}>
+        <Text>{result}</Text>
+      </View>
     </View>
   );
 };
